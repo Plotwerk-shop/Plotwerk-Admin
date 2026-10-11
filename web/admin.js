@@ -5,6 +5,7 @@ let session = '', page = 'overview', rows = [], cursor = null, hasNext = false, 
 let toastTimer;
 function message(value, error = false) {
   $('message').textContent = value; $('message').classList.toggle('error', error); $('message').hidden = false;
+  const dialog=[...document.querySelectorAll('dialog[open]')].at(-1);if(dialog){dialog.querySelector('.dialog-message')?.remove();const note=el('p',value,'dialog-message');note.setAttribute('role',error?'alert':'status');dialog.prepend(note);}
   clearTimeout(toastTimer); toastTimer = setTimeout(() => $('message').hidden = true, error ? 14000 : 5000);
 }
 function signedOut() {
@@ -48,7 +49,7 @@ function renderProducts(product) {
   const actions = el('div',undefined,'form-actions'); actions.append(saveButton('Produkt speichern', async () => {
     await api('product.save', {id:product.id,title:title.field.value,status:status.value,vendor:vendor.field.value,productType:kind.field.value});
     node.querySelector('h2').textContent = title.field.value; node.querySelector('.badge').textContent = statusNames[status.value];
-  })); node.append(actions);
+  })); actions.append(actionButton('Details & Varianten',()=>editCatalog('product',product.id))); node.append(actions);
   for (const variant of product.variants.nodes) {
     const row = el('div',undefined,'variant'); row.append(el('h3',variant.title === 'Default Title' ? 'Preis' : variant.title));
     const form = el('div',undefined,'inline-form'), price = input('Preis in Shop-Währung',variant.price,'number'); price.field.min = '0'; price.field.step = '.01';
@@ -61,7 +62,7 @@ function renderProducts(product) {
   return node;
 }
 function renderInventory(product) {
-  const node = card(product.title);
+  const node = card(product.title); node.append(actionButton('Lageretiketten & Barcode',()=>printLabel(product)));
   for (const variant of product.variants.nodes) {
     const row = el('div',undefined,'variant'); row.append(el('h3',variant.title === 'Default Title' ? 'Standardvariante' : variant.title));
     if(!variant.inventoryItem.tracked)row.append(el('p','Bestandsverfolgung ist für diese Variante deaktiviert.','muted'));
@@ -96,7 +97,7 @@ function renderCollection(collection) {
   const node = card(collection.title, String(count.count) + (count.precision === 'EXACT' ? '' : '+') + ' Produkte');
   node.append(el('p', count.count === 0 ? 'Diese Kategorie enthält noch keine Produkte.' : 'Kategorie in Shopify vorhanden.', 'muted'));
   const link = el('a', 'Kategorie im Shop öffnen ↗', 'secondary');
-  link.href = '/collections/' + encodeURIComponent(collection.handle); link.target = '_blank'; link.rel = 'noopener'; node.append(link);
+  link.href = '/collections/' + encodeURIComponent(collection.handle); link.target = '_blank'; link.rel = 'noopener'; node.append(link,actionButton('Kategorie bearbeiten',()=>editCatalog('collection',collection.id)),actionButton('Produkte zuordnen',()=>membership(collection)));
   return node;
 }
 function renderOverview(data) {
@@ -119,10 +120,11 @@ function renderOverview(data) {
 }
 function filteredRows() {
   const term=$('search').value.trim().toLocaleLowerCase('de-DE');
-  return rows.filter(row=>JSON.stringify([row.title,row.name,row.vendor,row.productType,row.note,row.handle,...(row.variants?.nodes||[]).map(v=>[v.title,v.sku])]).toLocaleLowerCase('de-DE').includes(term));
+  return rows.filter(row=>JSON.stringify([row.title,row.name,row.vendor,row.productType,row.note,row.handle,...(row.variants?.nodes||[]).map(v=>[v.title,v.sku,v.barcode])]).toLocaleLowerCase('de-DE').includes(term));
 }
 function render() {
   $('content').replaceChildren();
+  if(['products','collections'].includes(page))$('content').append(actionButton(page==='products'?'＋ Produkt anlegen':'＋ Kategorie anlegen',()=>editCatalog(page==='products'?'product':'collection')));
   const visible=filteredRows();
   if(!visible.length){const empty=el('div',undefined,'empty');empty.append(el('h2',$('search').value.trim()?'Keine passenden Einträge':page==='collections'?'Noch keine Kategorien':page==='orders'?'Noch keine Bestellungen':'Noch keine Produkte'),el('p',page==='orders'?'Hier erscheinen deine Bestellungen der letzten 60 Tage.':'Sobald Produkte in Shopify vorhanden sind, kannst du sie hier bearbeiten.'));$('content').append(empty);}
   visible.forEach(row=>$('content').append(page==='orders'?renderOrder(row):page==='collections'?renderCollection(row):page==='inventory'?renderInventory(row):renderProducts(row))); 
@@ -133,6 +135,7 @@ async function load(append=false){
   document.querySelectorAll('[data-page]').forEach(b=>b.disabled=true);
   if(!append)$('content').replaceChildren(el('p','Daten werden geladen …','loading'));
   try{
+    if(['discounts','ticker','mail'].includes(page)){$('list-tools').hidden=true;$('more').hidden=true;await featurePage();return;}
     if(page==='overview') {const data=await api('overview');renderOverview(data);$('more').hidden=true;return;}
     const key=page==='orders'?'orders':page==='collections'?'collections':'products',result=(await api(key,{after:append?cursor:null}))[key];
     rows=append?rows.concat(result.nodes):result.nodes;cursor=result.pageInfo.endCursor;hasNext=result.pageInfo.hasNextPage;render();
@@ -147,7 +150,7 @@ $('login-form').addEventListener('submit',async event=>{
 document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
   page=button.dataset.page;$('search').value='';rows=[];cursor=null;hasNext=false;
   document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b===button));
-  const descriptions={overview:['Shop-Übersicht','Dein aktueller Stand aus Shopify.'],collections:['Kategorien','Deine Shopify-Kollektionen und ihr Produktbestand.'],products:['Produkte & Preise','Deine Produkte. Bis ins Detail.'],inventory:['Lagerbestand','Dein Bestand – je Variante und Lagerstandort.'],orders:['Bestellungen','Die letzten 60 Tage. Alles im Blick.']};
+  const descriptions={discounts:['Gutscheine & Rabatte','Codes und automatische Rabatte ab Mindestmenge.'],ticker:['News-Ticker','Aktuelle Hinweise für deinen Shop.'],mail:['Anfragen & Newsletter','Postfach, Entwürfe und Versandstatus.'],overview:['Shop-Übersicht','Dein aktueller Stand aus Shopify.'],collections:['Kategorien','Deine Shopify-Kollektionen und ihr Produktbestand.'],products:['Produkte & Preise','Deine Produkte. Bis ins Detail.'],inventory:['Lagerbestand','Dein Bestand – je Variante und Lagerstandort.'],orders:['Bestellungen','Die letzten 60 Tage. Alles im Blick.']};
   [$('page-title').textContent,$('page-description').textContent]=descriptions[page];load();
 }));
 $('refresh').addEventListener('click',()=>load());$('more').addEventListener('click',()=>load(true));

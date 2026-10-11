@@ -3,3 +3,10 @@
 @media(prefers-reduced-motion:no-preference){button{transition:filter .15s,background .15s}}
 
 .overview-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.metric {font-size:2.4rem;color:#f284c4}.list-tools {margin:24px 0;padding:20px;border:1px solid #283348;border-radius:18px}.list-tools input {max-width:600px;margin:10px 0}.list-tools button {margin:10px}.overview-grid .card {margin:0}
+.editor { width:min(850px,calc(100vw - 32px)); max-height:85vh; overflow:auto; background:#171321;color:#f5f2fa;border:1px solid #443450;border-radius:24px;padding:24px; }
+.editor::backdrop { background:rgb(0 0 0 / 70%); }
+.editor label {display:block;margin-block:12px;}.editor button,.card>.primary,.card>.secondary {margin:8px 8px 8px 0;}
+.checkbox {display:flex!important;align-items:center;gap:10px;}.checkbox input {width:20px!important;}
+.mail-preview {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;background:#211b2d;padding:16px;border-radius:12px;}
+.warehouse-label {display:flex;flex-direction:column;align-items:center;width:70mm;padding:4mm;background:white;color:black;border:1px solid #aaa;font:12px Arial;text-align:center;break-inside:avoid;}.warehouse-label img {max-width:100%;height:22mm;}.print-labels {display:none;}
+@media print {body>* {display:none!important;}body>.print-labels {display:flex!important;flex-wrap:wrap;gap:3mm;}dialog {display:none!important;}@page {size:A4;margin:10mm;}}

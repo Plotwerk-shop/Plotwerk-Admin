@@ -7,6 +7,10 @@ from pathlib import Path
 
 from security import ADMIN_EMAIL, Denied, SessionStore, verify_proxy
 from shopify import Shopify, ShopifyError
+from features import Features
+from mailroom import Mailroom
+from urllib.parse import parse_qs
+import hmac
 
 ROOT = Path(__file__).parent
 
@@ -25,7 +29,7 @@ def text(value, maximum):
 
 PRODUCTS = """query($after:String) { products(first:5,after:$after,sortKey:UPDATED_AT,reverse:true) {
  pageInfo { hasNextPage endCursor } nodes { id title status vendor productType tags
- variants(first:10) { pageInfo { hasNextPage } nodes { id title price sku inventoryItem { id tracked
+ variants(first:10) { pageInfo { hasNextPage } nodes { id title price sku barcode inventoryItem { id tracked
  inventoryLevels(first:5) { pageInfo { hasNextPage } nodes { location { id name } quantities(names:["available"]) { name quantity } } } } } } } } }"""
 ORDERS = """query($after:String) { orders(first:25,after:$after,sortKey:CREATED_AT,reverse:true) {
  pageInfo { hasNextPage endCursor } nodes { id name createdAt displayFinancialStatus displayFulfillmentStatus note tags
@@ -52,6 +56,8 @@ class App:
         if sessions is None and not database_url:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.sessions = sessions or SessionStore(db_path, database_url)
+        self.features = Features(self)
+        self.mailroom = Mailroom(self)
 
     def owner_identity(self):
         customer = self.api.graphql("query($id:ID!) { customer(id:$id) { id defaultEmailAddress { emailAddress } } }", {"id": f"gid://shopify/Customer/{self.owner}"}).get("customer")
@@ -60,6 +66,13 @@ class App:
             raise Denied("Zugriff verweigert.")
 
     def dispatch(self, action, body):
+        result = self.features.dispatch(action, body)
+        if result is None:
+            result = self.mailroom.dispatch(action, body)
+        if result is not None:
+            if action not in ("product.detail", "product.media", "collection.detail", "discounts", "ticker", "label", "mail.status"):
+                self.sessions.audit(self.owner, action, str(body.get("id", "")))
+            return result
         if action == "overview":
             return self.api.graphql("""query { products(first:100) { pageInfo { hasNextPage } nodes { id title status } }
                 orders(first:50,sortKey:CREATED_AT,reverse:true) { pageInfo { hasNextPage } nodes { id name displayFinancialStatus displayFulfillmentStatus } } }""")
@@ -113,6 +126,23 @@ class App:
             method, path = environ["REQUEST_METHOD"], environ.get("PATH_INFO", "")
             if method == "GET" and path == "/healthz":
                 output = {"status": "running", "configured": self.ready}
+            elif method in ("GET", "POST") and path == "/unsubscribe":
+                params = parse_qs(environ.get("QUERY_STRING", ""), max_num_fields=3)
+                recipient, signature = params.get("email", [""])[0], params.get("sig", [""])[0]
+                if method == "POST":
+                    output = self.mailroom.unsubscribe(recipient, signature)
+                else:
+                    import html
+                    if not self.mailroom.ready or not hmac.compare_digest(self.mailroom.signature(recipient), signature):
+                        raise Denied("Ungültiger Abmeldelink.")
+                    mime = "text/html; charset=utf-8"
+                    output = '<!doctype html><html lang="de"><meta name="viewport" content="width=device-width"><title>Plotwerk Newsletter</title><h1>Newsletter abmelden</h1><p>Abmeldung für ' + html.escape(recipient) + '</p><form method="post"><button>Jetzt abmelden</button></form></html>'
+            elif method == "POST" and path == "/mail-worker":
+                key = self.config.get("MAIL_WORKER_KEY", "")
+                supplied = environ.get("HTTP_AUTHORIZATION", "")
+                if len(key) < 32 or not hmac.compare_digest(supplied, "Bearer " + key):
+                    raise Denied("Zugriff verweigert.")
+                output = self.mailroom.run()
             else:
                 if not self.ready:
                     raise RuntimeError("Adminbereich ist noch nicht eingerichtet.")
@@ -121,7 +151,7 @@ class App:
                     self.owner_identity()
                     output = (ROOT / "web/index.html").read_text().replace("__PROXY_PATH__", self.prefix)
                     mime = "text/html; charset=utf-8"
-                elif method == "GET" and path in ("/proxy/admin.js", "/proxy/admin.css"):
+                elif method == "GET" and path in ("/proxy/admin.js", "/proxy/features.js", "/proxy/admin.css"):
                     filename = path.rsplit("/", 1)[1]
                     output = (ROOT / "web" / filename).read_text()
                     mime = "text/javascript; charset=utf-8" if filename.endswith(".js") else "text/css; charset=utf-8"
@@ -129,7 +159,7 @@ class App:
                     if environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json":
                         raise Denied("Zugriff verweigert.")
                     length = int(environ.get("CONTENT_LENGTH") or 0)
-                    if not 0 < length <= 16384:
+                    if not 0 < length <= 65536:
                         raise ValueError("Ungültige Anfragegröße.")
                     body = json.loads(environ["wsgi.input"].read(length))
                     if not isinstance(body, dict):

@@ -1,3 +1,4 @@
 gunicorn==26.2.0
 psycopg[binary]==3.3.6
 certifi==2026.7.22
+python-barcode==0.16.1

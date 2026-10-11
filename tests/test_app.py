@@ -69,6 +69,16 @@ class AppTests(unittest.TestCase):
         self.assertEqual(result['status'], 200)
         return result['body']['session']
 
+    def test_extension_actions_cannot_bypass_owner_or_session(self):
+        for action in ('product.edit','product.create','variant.edit','collection.edit','collection.add','discount.create','ticker.save','label','mail.status','mail.sync','mail.draft','mail.approve','mail.run'):
+            self.assertEqual(self.request({'action':action})['status'],403)
+            self.assertEqual(self.request({'action':action},owner='43')['status'],403)
+        self.assertEqual(self.api.calls,[])
+
+    def test_external_worker_requires_separate_secret(self):
+        self.assertEqual(self.request(path='/mail-worker',query='')['status'],403)
+        self.assertEqual(self.api.calls,[])
+
     def test_new_read_features_require_session_and_owner(self):
         for action in ('overview', 'collections'):
             self.assertEqual(self.request({'action': action})['status'], 403)

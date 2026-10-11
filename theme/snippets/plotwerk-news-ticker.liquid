@@ -1,0 +1,14 @@
+{% assign plotwerk_news = shop.metafields.plotwerk.news_ticker.value %}
+{% if plotwerk_news.enabled and plotwerk_news.text != blank %}
+  <aside class="plotwerk-news" aria-label="Neuigkeiten">
+    {% if plotwerk_news.link != blank %}
+      <a href="{{ plotwerk_news.link | escape }}">{{ plotwerk_news.text | escape }}</a>
+    {% else %}
+      <span>{{ plotwerk_news.text | escape }}</span>
+    {% endif %}
+  </aside>
+  <style>
+    .plotwerk-news { padding:10px 18px; text-align:center; background:#21152f; color:#fff; font-size:14px; border-bottom:1px solid #a34bce; }
+    .plotwerk-news a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+  </style>
+{% endif %}
