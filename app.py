@@ -23,10 +23,10 @@ def text(value, maximum):
     return value
 
 
-PRODUCTS = """query($after:String) { products(first:25,after:$after,sortKey:UPDATED_AT,reverse:true) {
+PRODUCTS = """query($after:String) { products(first:5,after:$after,sortKey:UPDATED_AT,reverse:true) {
  pageInfo { hasNextPage endCursor } nodes { id title status vendor productType tags
- variants(first:100) { pageInfo { hasNextPage } nodes { id title price sku inventoryItem { id tracked
- inventoryLevels(first:20) { pageInfo { hasNextPage } nodes { location { id name } quantities(names:["available"]) { name quantity } } } } } } } } }"""
+ variants(first:10) { pageInfo { hasNextPage } nodes { id title price sku inventoryItem { id tracked
+ inventoryLevels(first:5) { pageInfo { hasNextPage } nodes { location { id name } quantities(names:["available"]) { name quantity } } } } } } } } }"""
 ORDERS = """query($after:String) { orders(first:25,after:$after,sortKey:CREATED_AT,reverse:true) {
  pageInfo { hasNextPage endCursor } nodes { id name createdAt displayFinancialStatus displayFulfillmentStatus note tags
  currentTotalPriceSet { shopMoney { amount currencyCode } } } } }"""

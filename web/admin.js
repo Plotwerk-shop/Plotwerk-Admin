@@ -13,7 +13,9 @@ function signedOut() {
 }
 async function api(action, values = {}) {
   const response = await fetch(base + '/api', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...values, action, session}), cache: 'no-store'});
-  const data = await response.json();
+  let data;
+  try { data = await response.json(); }
+  catch (_) { throw new Error('Die Datenabfrage liefert keine gültige Antwort (HTTP ' + response.status + '). Bei 502: Shopify-Abfrage fehlgeschlagen. Bitte neu laden und erneut anmelden.'); }
   if (!response.ok) { if (response.status === 403 && action !== 'login') signedOut(); throw new Error(data.error || 'Anfrage fehlgeschlagen.'); }
   return data;
 }
@@ -55,7 +57,7 @@ function renderProducts(product) {
       await api('variant.price',{productId:product.id,id:variant.id,price:price.field.value});
     })); row.append(form); node.append(row);
   }
-  if(product.variants.pageInfo.hasNextPage)node.append(el('p','Weitere Varianten vorhanden. Hier werden die ersten 100 angezeigt.','muted'));
+  if(product.variants.pageInfo.hasNextPage)node.append(el('p','Weitere Varianten vorhanden. Hier werden die ersten 10 angezeigt.','muted'));
   return node;
 }
 function renderInventory(product) {
@@ -75,10 +77,10 @@ function renderInventory(product) {
         before = quantity;
       })); row.append(form);
     }
-    if(variant.inventoryItem.inventoryLevels.pageInfo.hasNextPage)row.append(el('p','Weitere Lagerstandorte vorhanden; angezeigt werden die ersten 20.','muted'));
+    if(variant.inventoryItem.inventoryLevels.pageInfo.hasNextPage)row.append(el('p','Weitere Lagerstandorte vorhanden; angezeigt werden die ersten 5.','muted'));
     node.append(row);
   }
-  if(product.variants.pageInfo.hasNextPage)node.append(el('p','Weitere Varianten vorhanden; angezeigt werden die ersten 100.','muted'));
+  if(product.variants.pageInfo.hasNextPage)node.append(el('p','Weitere Varianten vorhanden; angezeigt werden die ersten 10.','muted'));
   return node;
 }
 function renderOrder(order) {

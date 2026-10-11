@@ -8,10 +8,10 @@ Ein eigener Adminbereich unter `/apps/plotwerk-admin` im Shopify-Shop, mit dunkl
 - Preise je Variante direkt speichern.
 - Verfügbaren Bestand je Variante und Standort ändern. Shopify prüft den vorherigen Bestand; Änderungen aus einer zwischenzeitlichen Bestellung werden nicht still überschrieben.
 - Bestellungen der letzten 60 Tage ansehen und deren Notizen bearbeiten.
-- Seitennavigation und Nachladen von jeweils 25 Produkten/Bestellungen.
+- Seitennavigation und Nachladen von jeweils 5 Produkten oder 25 Bestellungen.
 - Zugriff nur für die fest konfigurierte Shopify-Kunden-ID und deren E-Mail `info@plotwerk-shop.de`, zusätzlich mit einem eigenen Admin-Passwort.
 
-Noch nicht enthalten: neue Produkte erstellen, Produktbilder hochladen, Kollektionen verwalten, Rabatte, Versandetiketten, Erstattungen, Design-Editor oder vollständige Shopify-Verwaltung. Produktstatus „Aktiv“ allein veröffentlicht ein Produkt nicht automatisch in neuen Vertriebskanälen. Pro Produkt werden bis zu 100 Varianten und pro Variante bis zu 20 Standorte gezeigt; weitere Daten werden als solche kenntlich gemacht. Bestellstatus werden in dieser Version mit den Shopify-Statusbezeichnungen angezeigt.
+Noch nicht enthalten: neue Produkte erstellen, Produktbilder hochladen, Kollektionen verwalten, Rabatte, Versandetiketten, Erstattungen, Design-Editor oder vollständige Shopify-Verwaltung. Produktstatus „Aktiv“ allein veröffentlicht ein Produkt nicht automatisch in neuen Vertriebskanälen. Pro Produkt werden bis zu 10 Varianten und pro Variante bis zu 5 Standorte gezeigt; weitere Daten werden als solche kenntlich gemacht. Bestellstatus werden in dieser Version mit den Shopify-Statusbezeichnungen angezeigt.
 
 ## 1. Shopify-App vorbereiten
 

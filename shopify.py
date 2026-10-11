@@ -1,5 +1,6 @@
 """Server-side Shopify Admin API; credentials are never returned to the browser."""
 import json
+import logging
 import threading
 import time
 from urllib.error import HTTPError, URLError
@@ -42,6 +43,10 @@ class Shopify:
     def graphql(self, query, variables=None):
         data = self.request("/admin/api/2026-10/graphql.json", {"query": query, "variables": variables or {}}, self.access_token())
         if data.get("errors"):
+            # Only fixed diagnostic codes, never query values, tokens or customer data.
+            allowed = {"MAX_COST_EXCEEDED", "THROTTLED", "ACCESS_DENIED", "GRAPHQL_VALIDATION_FAILED"}
+            codes = [(error.get("extensions") or {}).get("code") for error in data["errors"] if isinstance(error, dict)]
+            logging.warning("Shopify GraphQL rejected request: %s", ",".join(code if code in allowed else "OTHER" for code in codes))
             raise ShopifyError("Shopify-Anfrage fehlgeschlagen. API-Berechtigungen und Version prüfen.")
         result = data.get("data")
         if not isinstance(result, dict):
