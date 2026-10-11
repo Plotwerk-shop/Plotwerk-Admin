@@ -4,6 +4,7 @@ import hmac
 import secrets
 import sqlite3
 import time
+from contextlib import contextmanager
 from urllib.parse import parse_qs
 
 ADMIN_EMAIL = "info@plotwerk-shop.de"
@@ -55,31 +56,55 @@ def password_matches(password, encoded):
 
 
 class SessionStore:
-    def __init__(self, path):
+    def __init__(self, path, database_url=""):
         self.path = path
+        self.database_url = database_url
+        if database_url and not database_url.startswith(("postgresql://", "postgres://")):
+            raise ValueError("DATABASE_URL muss eine PostgreSQL-Verbindung sein.")
         with self.connect() as db:
-            db.executescript("""
-                CREATE TABLE IF NOT EXISTS sessions (digest TEXT PRIMARY KEY, owner TEXT, expires REAL);
-                CREATE TABLE IF NOT EXISTS attempts (owner TEXT PRIMARY KEY, count INTEGER, starts REAL);
-                CREATE TABLE IF NOT EXISTS audit (at REAL, owner TEXT, action TEXT, resource TEXT);
-            """)
+            for statement in (
+                "CREATE TABLE IF NOT EXISTS sessions (digest TEXT PRIMARY KEY, owner TEXT, expires DOUBLE PRECISION)",
+                "CREATE TABLE IF NOT EXISTS attempts (owner TEXT PRIMARY KEY, count INTEGER, starts DOUBLE PRECISION)",
+                "CREATE TABLE IF NOT EXISTS audit (at DOUBLE PRECISION, owner TEXT, action TEXT, resource TEXT)",
+            ):
+                db.execute(statement)
 
+    @contextmanager
     def connect(self):
-        return sqlite3.connect(self.path, timeout=15)
+        if self.database_url:
+            import psycopg
+            with psycopg.connect(self.database_url, sslmode="verify-full", sslrootcert="system",
+                                 connect_timeout=15) as connection:
+                connection.execute("SET LOCAL statement_timeout = '15s'")
+                yield PostgresStatements(connection)
+        else:
+            connection = sqlite3.connect(self.path, timeout=15)
+            try:
+                with connection:
+                    yield connection
+            finally:
+                connection.close()
+
+    def lock_owner(self, db, owner):
+        if self.database_url:
+            db.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (owner,))
+        else:
+            db.execute("BEGIN IMMEDIATE")
 
     def login(self, owner, password, encoded, now=None):
         now = time.time() if now is None else now
         with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
+            self.lock_owner(db, owner)
             row = db.execute("SELECT count, starts FROM attempts WHERE owner=?", (owner,)).fetchone()
             if row and now - row[1] < 900 and row[0] >= 5:
                 raise Denied("Zu viele Versuche. Bitte nach 15 Minuten erneut versuchen.")
             count, starts = (row[0], row[1]) if row and now - row[1] < 900 else (0, now)
-            db.execute("INSERT OR REPLACE INTO attempts VALUES (?,?,?)", (owner, count + 1, starts))
+            db.execute("INSERT INTO attempts VALUES (?,?,?) ON CONFLICT(owner) DO UPDATE SET count=excluded.count, starts=excluded.starts", (owner, count + 1, starts))
         if not password_matches(password, encoded):
             raise Denied("Anmeldung fehlgeschlagen.")
         token = secrets.token_urlsafe(32)
         with self.connect() as db:
+            self.lock_owner(db, owner)
             db.execute("DELETE FROM attempts WHERE owner=?", (owner,))
             db.execute("DELETE FROM sessions WHERE expires < ? OR owner=?", (now, owner))
             db.execute("INSERT INTO sessions VALUES (?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), owner, now + 1800))
@@ -100,3 +125,12 @@ class SessionStore:
     def audit(self, owner, action, resource):
         with self.connect() as db:
             db.execute("INSERT INTO audit VALUES (?,?,?,?)", (time.time(), owner, action, resource))
+
+
+class PostgresStatements:
+    """Adapt fixed internal SQL placeholders; values remain driver-bound parameters."""
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, statement, parameters=()):
+        return self.connection.execute(statement.replace("?", "%s"), parameters)

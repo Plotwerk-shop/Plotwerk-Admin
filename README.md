@@ -37,23 +37,40 @@ Für das zusätzliche Passwort lokal ausführen (Python 3.13 empfohlen):
 python3 tools/hash_password.py
 ```
 
-Das Passwort zweimal verdeckt eingeben. Den ausgegebenen Hash als `ADMIN_PASSWORD_HASH` beim Hoster speichern. Das Passwort selbst wird nicht gespeichert. Nach einem Passwortwechsel den Dienst neu starten und alle Sessions durch Löschen der `sessions`-Tabelle widerrufen; diese Version hat noch keine Passwortwechsel-Oberfläche.
+Das Passwort zweimal verdeckt eingeben. Den ausgegebenen Hash als `ADMIN_PASSWORD_HASH` beim Hoster speichern. Das Passwort selbst wird nicht gespeichert. Nach einem Passwortwechsel den Dienst neu starten und alle Sessions durch `DELETE FROM sessions` in der Datenbank widerrufen; diese Version hat noch keine Passwortwechsel-Oberfläche.
 
-## 3. Hosting
+## 3. Kostenlos betreiben: Render Free + Neon Free
 
-Benötigt werden HTTPS, Python 3.13 oder Docker und ein **dauerhaftes, gesichertes Datenverzeichnis** für SQLite. Eine einzige Instanz verwenden. Sessions, Anmeldeversuche und Änderungsprotokoll werden darin abgelegt. Keine API-Schlüssel oder Passwörter werden protokolliert. Zugangsdaten und Query-Strings dürfen auch in den Logs des vorgeschalteten Hosters nicht öffentlich erscheinen.
+Für diese Einrichtung ist kein kostenpflichtiges Webhosting und kein zusätzliches Domain-Abo nötig. Render führt die App aus; Neon speichert Sessions, Passwortversuche und Änderungsprotokoll dauerhaft in PostgreSQL. Produkt- und Bestelldaten bleiben in Shopify. Kostenlose Tarife gelten innerhalb der aktuellen Anbieterlimits; sie garantieren weder dauerhaft unveränderte Preise noch Verfügbarkeit.
 
-Beispiel mit Render: **New → Web Service → dieses GitHub-Repository verbinden**, Python wählen:
+### A. Neon-Datenbank anlegen
+
+1. Auf [Neon](https://console.neon.tech) anmelden, **Free** wählen und ein Projekt `plotwerk-admin` erstellen. Wenn angeboten eine EU-Region wählen.
+2. **Connect** öffnen und die PostgreSQL-Verbindungsadresse kopieren (Connection String, vorzugsweise Pooled). Die Adresse enthält ein Datenbankpasswort: ausschließlich in Render als `DATABASE_URL` hinterlegen, niemals im Repository oder im Chat veröffentlichen.
+3. Scale to zero aktiv lassen; nur diese kleine Admin-Datenbank verwenden. Die App legt ihre Tabellen automatisch an. Bei Datenbankfehlern gibt es keinen Ersatz durch flüchtigen Speicher.
+
+### B. Render einrichten
+
+1. Bei [Render](https://dashboard.render.com) mit GitHub anmelden.
+2. **New → Blueprint**, dieses Repository verbinden. Die mitgelieferte `render.yaml` wählt ausdrücklich **plan: free**, ohne kostenpflichtige Datenbank und ohne Laufwerk.
+3. Die abgefragten Secrets aus der Tabelle unten eintragen. `DATABASE_URL` kommt von Neon. `REQUIRE_POSTGRES=true` ist bereits in der Vorlage gesetzt und verhindert einen versehentlichen Start mit flüchtiger SQLite-Datenbank.
+4. Vor Erstellung prüfen, dass der Webdienst **Free** ist und keine kostenpflichtige Ressource aufgeführt wird. Keine kostenpflichtige Option aktivieren. Aktuelle Gratislimits und Ausgabenbegrenzung im Konto prüfen; enthaltenes Kontingent nicht absichtlich überschreiten.
+5. Nach erfolgreichem Deployment die echte `https://…onrender.com`-Adresse notieren und damit den Shopify-App-Proxy in Schritt 4 verbinden.
+
+Falls du stattdessen **New → Web Service** verwendest, Python und ausdrücklich **Free** auswählen:
 
 | Einstellung | Wert |
 | --- | --- |
 | Build Command | `pip install -r requirements.txt` |
 | Start Command | `gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 60 app:application` |
 | Health Check | `/healthz` |
-| Dauerhaftes Laufwerk | Mount-Pfad `/data` |
-| `DATABASE_PATH` | `/data/admin.sqlite3` |
+| `DATABASE_URL` | Geheime Neon-Verbindungsadresse |
+| `REQUIRE_POSTGRES` | `true` |
+| Laufwerk / Render-Datenbank | Keines anlegen |
 
-Bei Render braucht ein dauerhaftes Laufwerk einen kostenpflichtigen Dienst. Preise vor der Buchung prüfen. Das Repository startet oder bezahlt keinen Hosting-Dienst. Alternativ Docker hinter einem HTTPS-Reverse-Proxy betreiben, `/data` als dauerhaftes Volume einbinden und für UID 10001 schreibbar machen.
+Render Free pausiert nach 15 Minuten ohne Aufrufe. Beim nächsten Öffnen kann der Start etwa eine Minute dauern, eventuell muss die Shop-Seite danach neu geladen werden. SQLite-Dateien würden dabei verloren gehen; deshalb nutzt diese Einrichtung Neon. Auch Neon kann bei Inaktivität pausieren, behält dabei aber die Daten. Kein künstliches Dauer-Pinging verwenden. Wenn ein Gratislimit erreicht wird, kann der Adminbereich vorübergehend nicht verfügbar sein; das Shopify-Admin bleibt als Zugang erhalten.
+
+Für lokale Entwicklung ist SQLite weiterhin möglich: `DATABASE_URL` weglassen, `REQUIRE_POSTGRES` nicht auf `true` setzen und `DATABASE_PATH=data/admin.sqlite3` verwenden. Für bereits vorhandenes eigenes Docker-Hosting kann `/data` weiterhin als dauerhaftes Volume eingebunden werden. Die Gratisvorlage benötigt kein solches Volume.
 
 Diese Umgebungsvariablen **als Secret-Einstellungen** setzen:
 
@@ -65,7 +82,8 @@ Diese Umgebungsvariablen **als Secret-Einstellungen** setzen:
 | `ADMIN_CUSTOMER_ID` | Numerische ID deines Kundenkontos |
 | `ADMIN_PASSWORD_HASH` | Ausgabe des Passwort-Tools |
 | `APP_PROXY_PATH` | `/apps/plotwerk-admin` |
-| `DATABASE_PATH` | `/data/admin.sqlite3` |
+| `DATABASE_URL` | PostgreSQL-Verbindungsadresse aus Neon, als Secret |
+| `REQUIRE_POSTGRES` | `true` für den kostenlosen Betrieb |
 
 Die `.env.example` ist nur eine Vorlage; `.env` wird nicht automatisch eingelesen. Ohne gültige Pflichtangaben bleibt der Dienst gesperrt. `/healthz` ist ein öffentlicher, datenfreier Prozesscheck; `configured: true` bestätigt nur die Konfiguration, **nicht** eine erfolgreiche Shopify-Verbindung.
 
@@ -99,7 +117,7 @@ Dies steuert nur die Sichtbarkeit des Links. Der echte Zugriffsschutz wird bei *
 python3 -m unittest discover -s tests -v
 ```
 
-Automatisierte Tests verwenden ausschließlich eine simulierte Shopify-Anbindung. Ein Live-Test benötigt die installierte App und den eingerichteten Hoster:
+18 automatisierte Tests prüfen Zugriffsschutz, Sessions und Datenbankgrenzen. Shopify und die PostgreSQL-Verbindung werden dabei simuliert; die Sessionlogik läuft zusätzlich mit lokaler SQLite. Eine echte Neon-Verbindung inklusive TLS und SQL muss nach der Einrichtung geprüft werden. Ein Live-Test benötigt die installierte App und den eingerichteten Hoster:
 
 1. Ausgeloggt und als anderes Kundenkonto muss der Proxy den Zugang verweigern.
 2. Dein Konto ohne zusätzliches Admin-Passwort darf keine Shopdaten abrufen.
@@ -114,6 +132,6 @@ Shopify-Proxy-Signaturen werden zeitlich begrenzt geprüft. Eine falsche oder fe
 
 Produkt- und Bestelldaten werden im Browser mit DOM-Textfeldern dargestellt, nicht als ungeprüftes HTML. Änderungsanfragen verwenden JSON und feste GraphQL-Abfragen mit Variablen. Keine beliebigen GraphQL-Abfragen aus dem Browser. Bei Fehlern werden keine Rohantworten mit Zugangsdaten ausgegeben. Schreibzugriffe werden nicht automatisch wiederholt. Shopify-Bestandsänderungen verwenden Vergleichsbestand und Idempotenzkennung.
 
-Das persistente Laufwerk und Backups schützen. Shopify-App-Berechtigungen beschränken und unbenutzte später entfernen. Das Änderungsprotokoll enthält Zeit, Kunden-ID, Aktion und Ressourcen-ID, keine Bestellnotizen. Dies ist eine erste implementierte Version; eine erfolgreiche Verbindung zum echten Shop wurde noch nicht getestet.
+Den Datenbankzugang schützen; Wiederherstellungs- und Exportmöglichkeiten des gewählten Datenbanktarifs prüfen. Shopify-App-Berechtigungen beschränken und unbenutzte später entfernen. Das Änderungsprotokoll enthält Zeit, Kunden-ID, Aktion und Ressourcen-ID, keine Bestellnotizen. Dies ist eine erste implementierte Version; eine erfolgreiche Verbindung zum echten Shop wurde noch nicht getestet.
 
-Dokumentation: [App-Proxy-Authentifizierung](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies), [Client Credentials](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant), [Bestände](https://shopify.dev/docs/api/admin-graphql/latest/mutations/inventorySetQuantities), [Render Python Hosting](https://render.com/docs/deploy-flask), [Render Disks](https://render.com/docs/disks).
+Dokumentation: [App-Proxy-Authentifizierung](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies), [Client Credentials](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant), [Bestände](https://shopify.dev/docs/api/admin-graphql/latest/mutations/inventorySetQuantities), [Render Python Hosting](https://render.com/docs/deploy-flask), [Render Free](https://render.com/docs/free), [Neon Free](https://neon.com/blog/neon-free-plan-1-gb-per-project), [Neon-Verbindung](https://neon.com/docs/get-started/connect-neon).

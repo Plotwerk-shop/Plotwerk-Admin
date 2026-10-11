@@ -46,9 +46,12 @@ class App:
             and re.fullmatch(r"/apps/[a-z0-9-]+", self.prefix))
         self.api = shopify or Shopify(self.shop, self.config.get("SHOPIFY_CLIENT_ID", ""), secret)
         db_path = self.config.get("DATABASE_PATH", "data/admin.sqlite3")
-        if sessions is None:
+        database_url = self.config.get("DATABASE_URL", "")
+        if self.config.get("REQUIRE_POSTGRES") == "true" and not database_url and sessions is None:
+            raise RuntimeError("Dauerhafte PostgreSQL-Datenbank fehlt. DATABASE_URL konfigurieren.")
+        if sessions is None and not database_url:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self.sessions = sessions or SessionStore(db_path)
+        self.sessions = sessions or SessionStore(db_path, database_url)
 
     def owner_identity(self):
         customer = self.api.graphql("query($id:ID!) { customer(id:$id) { id defaultEmailAddress { emailAddress } } }", {"id": f"gid://shopify/Customer/{self.owner}"}).get("customer")
