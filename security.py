@@ -73,7 +73,8 @@ class SessionStore:
     def connect(self):
         if self.database_url:
             import psycopg
-            with psycopg.connect(self.database_url, sslmode="verify-full", sslrootcert="system",
+            import certifi
+            with psycopg.connect(self.database_url, sslmode="verify-full", sslrootcert=certifi.where(),
                                  connect_timeout=15) as connection:
                 connection.execute("SET LOCAL statement_timeout = '15s'")
                 yield PostgresStatements(connection)

@@ -1,5 +1,6 @@
 """Database boundary checks; a real Neon connection needs deployment credentials."""
 import tempfile
+import certifi
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -22,7 +23,8 @@ class DatabaseTests(unittest.TestCase):
                 store.lock_owner(db, "42")
                 db.execute("SELECT owner FROM sessions WHERE digest=?", ("untrusted' value",))
             self.assertEqual(connect.call_args.kwargs["sslmode"], "verify-full")
-            self.assertEqual(connect.call_args.kwargs["sslrootcert"], "system")
+            self.assertEqual(connect.call_args.kwargs["sslrootcert"], certifi.where())
+            self.assertTrue(Path(certifi.where()).is_file())
             connection.execute.assert_any_call("SELECT pg_advisory_xact_lock(hashtext(%s))", ("42",))
             connection.execute.assert_any_call("SELECT owner FROM sessions WHERE digest=%s", ("untrusted' value",))
 
