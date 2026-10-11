@@ -2,6 +2,13 @@
 
 Ein eigener Adminbereich unter `/apps/plotwerk-admin` im Shopify-Shop, mit dunklem Plotwerk-Design und pink-violetten Akzenten. Der Code ist eine erste Version, kein bereits eingerichteter oder live getesteter Dienst.
 
+## Neu: Übersicht, Kategorien, Suche und Export
+
+- Shop-Übersicht mit aktiven Produkten, Entwürfen und offenen Bestellungen. Beschriftete Stichprobe: höchstens 100 Produkte und 50 neueste Bestellungen, keine vollständigen Analytics oder Umsatzstatistik.
+- Kategorienübersicht aus Shopify-Kollektionen: Titel, Produktanzahl und Link zur Kollektion. Keine Änderung der Kollektionen in dieser Version.
+- Suche in den jeweils geladenen Einträgen, einschließlich SKU und Bestellnotizen. Weitere Einträge zuerst nachladen.
+- Bestell-CSV für die geladenen, gefilterten Bestellungen. CSV-Felder sind escaped und gegen typische Tabellenformeln geschützt.
+
 ## Enthalten
 
 - Bestehende Produkte bearbeiten: Titel, Marke, Produkttyp und Status.
@@ -135,3 +142,20 @@ Produkt- und Bestelldaten werden im Browser mit DOM-Textfeldern dargestellt, nic
 Den Datenbankzugang schützen; Wiederherstellungs- und Exportmöglichkeiten des gewählten Datenbanktarifs prüfen. Shopify-App-Berechtigungen beschränken und unbenutzte später entfernen. Das Änderungsprotokoll enthält Zeit, Kunden-ID, Aktion und Ressourcen-ID, keine Bestellnotizen. Dies ist eine erste implementierte Version; eine erfolgreiche Verbindung zum echten Shop wurde noch nicht getestet.
 
 Dokumentation: [App-Proxy-Authentifizierung](https://shopify.dev/docs/apps/build/online-store/app-proxies/authenticate-app-proxies), [Client Credentials](https://shopify.dev/docs/apps/build/authentication-authorization/client-credentials-grant), [Bestände](https://shopify.dev/docs/api/admin-graphql/latest/mutations/inventorySetQuantities), [Render Python Hosting](https://render.com/docs/deploy-flask), [Render Free](https://render.com/docs/free), [Neon Free](https://neon.com/blog/neon-free-plan-1-gb-per-project), [Neon-Verbindung](https://neon.com/docs/get-started/connect-neon).
+
+## Admin-Link direkt neben Konto im Shopify-Header
+
+Dieser Schritt muss im Shopify-Theme durchgeführt werden. Das Backend-Repository enthält keinen Zugriff auf das live verwendete Theme und hat es nicht verändert. Die Domain plotwerk-shop.de führt derzeit noch zu Base44; im neuen Shopify-Shop wird der relative Link bereits unter seiner myshopify.com-Domain verwendet.
+
+1. Shopify → Onlineshop → Themes → beim gewünschten Theme → Code bearbeiten.
+2. Unter Snippets die Datei `plotwerk-admin-link.liquid` anlegen und den Inhalt aus `theme/snippets/plotwerk-admin-link.liquid` dieses Repositorys einfügen.
+3. Die Datei öffnen, die die Konto-Aktion im Header rendert (bei Heritage häufig `snippets/header-actions.liquid`; anhand des tatsächlichen Themes prüfen).
+4. Direkt vor oder nach dem Konto-Element, innerhalb der gemeinsamen Header-Aktionsgruppe, aber **außerhalb** bestehender Links/Buttons einfügen:
+
+```liquid
+{% render 'plotwerk-admin-link' %}
+```
+
+5. Eingeloggt als info@plotwerk-shop.de auf Desktop und Mobil prüfen. Als fremder Kunde und ausgeloggt darf der Link nicht sichtbar sein.
+
+Neue Kundenkonten können den `customer`-Status im Theme anders bereitstellen. Falls das Theme keinen angemeldeten Kunden erkennt, erscheint der Link nicht; die Prüfung keinesfalls durch eine Browser-E-Mail ersetzen. Für den exakten Einbauort wird die tatsächliche Header-Datei benötigt.

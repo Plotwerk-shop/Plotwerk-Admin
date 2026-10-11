@@ -34,15 +34,23 @@
       <div class="brand">Plotwerk<span>ADMIN</span></div>
       <p class="eyebrow">DEINE SCHALTZENTRALE</p>
       <nav aria-label="Verwaltung">
-        <button data-page="products" class="nav-item active">◇ <span>Produkte & Preise</span></button>
+        <button data-page="overview" class="nav-item active">▦ <span>Shop-Übersicht</span></button>
+        <button data-page="collections" class="nav-item">◇ <span>Kategorien</span></button>
+        <button data-page="products" class="nav-item">◇ <span>Produkte & Preise</span></button>
         <button data-page="inventory" class="nav-item">▦ <span>Lagerbestand</span></button>
         <button data-page="orders" class="nav-item">▤ <span>Bestellungen</span></button>
       </nav>
       <div class="sidebar-bottom"><p>Angemeldet als<br><strong>info@plotwerk-shop.de</strong></p><button id="logout" class="secondary">Abmelden</button><a href="/">Zum Shop ↗</a></div>
     </aside>
     <main>
-      <header class="page-header"><div><p class="eyebrow">PLOTWERK VERWALTUNG</p><h1 id="page-title">Produkte & Preise</h1><p id="page-description" class="muted">Deine Produkte. Bis ins Detail.</p></div><button id="refresh" class="secondary">↻ Aktualisieren</button></header>
-      <div class="info-strip"><span class="live-dot" aria-hidden="true"></span>Direkt mit Shopify verbunden<span class="muted">Änderungen wirken auf deinen Shop.</span></div>
+      <header class="page-header"><div><p class="eyebrow">PLOTWERK VERWALTUNG</p><h1 id="page-title">Shop-Übersicht</h1><p id="page-description" class="muted">Dein aktueller Stand aus Shopify.</p></div><button id="refresh" class="secondary">↻ Aktualisieren</button></header>
+      <div class="info-strip"><span class="live-dot" aria-hidden="true"></span>Verwaltung über Shopify<span class="muted">Änderungen wirken auf deinen Shop.</span></div>
+      <div id="list-tools" class="list-tools" hidden>
+        <label for="search">Geladene Einträge durchsuchen</label>
+        <input id="search" type="search" placeholder="Titel, Bestellnummer oder SKU …">
+        <button id="export" class="secondary" hidden>Geladene Bestellungen als CSV</button>
+        <p class="muted">Suche und Export beziehen sich auf die bisher geladenen Einträge. Mit „Weitere laden“ erweitern.</p>
+      </div>
       <div id="content" aria-busy="false"></div>
       <button id="more" class="secondary load-more" hidden>Weitere laden</button>
       <footer>Individuell gemacht. Von dir verwaltet.</footer>

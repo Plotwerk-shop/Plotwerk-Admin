@@ -60,6 +60,12 @@ class App:
             raise Denied("Zugriff verweigert.")
 
     def dispatch(self, action, body):
+        if action == "overview":
+            return self.api.graphql("""query { products(first:100) { pageInfo { hasNextPage } nodes { id title status } }
+                orders(first:50,sortKey:CREATED_AT,reverse:true) { pageInfo { hasNextPage } nodes { id name displayFinancialStatus displayFulfillmentStatus } } }""")
+        if action == "collections":
+            return self.api.graphql("""query($after:String) { collections(first:25,after:$after) {
+                pageInfo { hasNextPage endCursor } nodes { id title handle productsCount { count precision } } } }""", {"after": body.get("after")})
         if action == "products":
             return self.api.graphql(PRODUCTS, {"after": body.get("after")})
         if action == "orders":

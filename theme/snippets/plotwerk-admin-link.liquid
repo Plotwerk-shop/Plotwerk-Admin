@@ -1,0 +1,21 @@
+{%- comment -%}
+  Render inside the header actions next to the account control:
+  {% render 'plotwerk-admin-link' %}
+  Visibility is not authorization; backend checks the pinned customer ID,
+  current email, proxy signature and additional admin session on every request.
+{%- endcomment -%}
+{%- if customer -%}
+  {%- assign plotwerk_customer_email = customer.email | strip | downcase -%}
+  {%- if plotwerk_customer_email == 'info@plotwerk-shop.de' -%}
+    <a href="/apps/plotwerk-admin" class="plotwerk-admin-link" aria-label="Plotwerk Admin öffnen">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3Z"/></svg>
+      <span>Admin</span>
+    </a>
+    <style>
+      .plotwerk-admin-link {display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;border:1px solid #b757ca;border-radius:10px;color:#ec9be1;text-decoration:none;font-size:14px;line-height:1.2;white-space:nowrap;background:#171021;flex-shrink:0;}
+      .plotwerk-admin-link:hover {background:#301839;color:#fff;}
+      .plotwerk-admin-link:focus-visible {outline:2px solid currentColor;outline-offset:3px;}
+      @media(max-width:749px){.plotwerk-admin-link{padding:8px;font-size:12px;gap:4px;}}
+    </style>
+  {%- endif -%}
+{%- endif -%}

@@ -1,7 +1,7 @@
 'use strict';
 const base = new URL(document.currentScript.src).pathname.replace(/\/admin\.js$/, '');
 const $ = id => document.getElementById(id);
-let session = '', page = 'products', rows = [], cursor = null, hasNext = false, busy = false;
+let session = '', page = 'overview', rows = [], cursor = null, hasNext = false, busy = false;
 let toastTimer;
 function message(value, error = false) {
   $('message').textContent = value; $('message').classList.toggle('error', error); $('message').hidden = false;
@@ -91,18 +91,50 @@ function renderOrder(order) {
   const label=el('label','Bestellnotiz'),note=el('textarea');note.rows=3;note.maxLength=2000;note.value=order.note||'';label.append(note);node.append(label);
   const actions=el('div',undefined,'form-actions');actions.append(saveButton('Notiz speichern',()=>api('order.note',{id:order.id,note:note.value})));node.append(actions);return node;
 }
+function renderCollection(collection) {
+  const count = collection.productsCount;
+  const node = card(collection.title, String(count.count) + (count.precision === 'EXACT' ? '' : '+') + ' Produkte');
+  node.append(el('p', count.count === 0 ? 'Diese Kategorie enthält noch keine Produkte.' : 'Kategorie in Shopify vorhanden.', 'muted'));
+  const link = el('a', 'Kategorie im Shop öffnen ↗', 'secondary');
+  link.href = '/collections/' + encodeURIComponent(collection.handle); link.target = '_blank'; link.rel = 'noopener'; node.append(link);
+  return node;
+}
+function renderOverview(data) {
+  const products = data.products.nodes, orders = data.orders.nodes;
+  const grid = el('div', undefined, 'overview-grid');
+  const metrics = [
+    ['Produkte geprüft', products.length], ['Aktive Produkte', products.filter(p=>p.status==='ACTIVE').length],
+    ['Produktentwürfe', products.filter(p=>p.status==='DRAFT').length],
+    ['Bestellungen geprüft', orders.length],
+    ['Noch nicht erfüllt', orders.filter(o=>o.displayFulfillmentStatus==='UNFULFILLED').length],
+    ['Zahlung ausstehend', orders.filter(o=>['PENDING','PARTIALLY_PAID'].includes(o.displayFinancialStatus)).length]
+  ];
+  for (const [title,value] of metrics) {const item=card(title);item.append(el('strong',String(value),'metric'));grid.append(item);}
+  const note=el('p','Auswertung der ersten bis zu 100 Produkte und der neuesten bis zu 50 Bestellungen innerhalb der zugänglichen letzten 60 Tage. Aktive Produkte sind nicht automatisch in jedem Vertriebskanal veröffentlicht.','muted');
+  if(data.products.pageInfo.hasNextPage || data.orders.pageInfo.hasNextPage)note.append(document.createTextNode(' Weitere Daten vorhanden; dies sind keine Shop-Gesamtsummen.'));
+  const check=card('Deine nächsten Schritte');
+  check.append(el('p',products.length ? 'Produkte vorhanden. Entwürfe vor der Veröffentlichung prüfen.' : 'Noch keine Produkte vorhanden. Lege deine ersten Artikel in Shopify an.'));
+  check.append(el('p','Versand, Zahlungsmethoden und Pflichtseiten im Shopify-Admin prüfen. Diese Einstellungen werden hier nicht automatisch geprüft.','muted'));
+  $('content').replaceChildren(grid,note,check);
+}
+function filteredRows() {
+  const term=$('search').value.trim().toLocaleLowerCase('de-DE');
+  return rows.filter(row=>JSON.stringify([row.title,row.name,row.vendor,row.productType,row.note,row.handle,...(row.variants?.nodes||[]).map(v=>[v.title,v.sku])]).toLocaleLowerCase('de-DE').includes(term));
+}
 function render() {
   $('content').replaceChildren();
-  if(!rows.length){const empty=el('div',undefined,'empty');empty.append(el('h2',page==='orders'?'Noch keine Bestellungen':'Noch keine Produkte'),el('p',page==='orders'?'Hier erscheinen deine Bestellungen der letzten 60 Tage.':'Sobald Produkte in Shopify vorhanden sind, kannst du sie hier bearbeiten.'));$('content').append(empty);}
-  rows.forEach(row=>$('content').append(page==='orders'?renderOrder(row):page==='inventory'?renderInventory(row):renderProducts(row)));
+  const visible=filteredRows();
+  if(!visible.length){const empty=el('div',undefined,'empty');empty.append(el('h2',$('search').value.trim()?'Keine passenden Einträge':page==='collections'?'Noch keine Kategorien':page==='orders'?'Noch keine Bestellungen':'Noch keine Produkte'),el('p',page==='orders'?'Hier erscheinen deine Bestellungen der letzten 60 Tage.':'Sobald Produkte in Shopify vorhanden sind, kannst du sie hier bearbeiten.'));$('content').append(empty);}
+  visible.forEach(row=>$('content').append(page==='orders'?renderOrder(row):page==='collections'?renderCollection(row):page==='inventory'?renderInventory(row):renderProducts(row))); 
   $('more').hidden = !hasNext;
 }
 async function load(append=false){
-  if(busy)return;busy=true;$('refresh').disabled=true;$('more').disabled=true;$('content').setAttribute('aria-busy','true');
+  if(busy)return;busy=true;$('list-tools').hidden=page==='overview';$('export').hidden=page!=='orders';$('refresh').disabled=true;$('more').disabled=true;$('content').setAttribute('aria-busy','true');
   document.querySelectorAll('[data-page]').forEach(b=>b.disabled=true);
   if(!append)$('content').replaceChildren(el('p','Daten werden geladen …','loading'));
   try{
-    const key=page==='orders'?'orders':'products',result=(await api(key,{after:append?cursor:null}))[key];
+    if(page==='overview') {const data=await api('overview');renderOverview(data);$('more').hidden=true;return;}
+    const key=page==='orders'?'orders':page==='collections'?'collections':'products',result=(await api(key,{after:append?cursor:null}))[key];
     rows=append?rows.concat(result.nodes):result.nodes;cursor=result.pageInfo.endCursor;hasNext=result.pageInfo.hasNextPage;render();
   }catch(error){message(error.message,true);if(session && !append){$('content').replaceChildren(el('p','Daten konnten nicht geladen werden. Bitte erneut aktualisieren.','muted'));$('more').hidden=true;}}
   finally{busy=false;$('refresh').disabled=false;$('more').disabled=false;$('content').setAttribute('aria-busy','false');document.querySelectorAll('[data-page]').forEach(b=>b.disabled=false);}
@@ -113,11 +145,24 @@ $('login-form').addEventListener('submit',async event=>{
   catch(error){message(error.message,true);}finally{button.disabled=false;}
 });
 document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
-  page=button.dataset.page;rows=[];cursor=null;hasNext=false;
+  page=button.dataset.page;$('search').value='';rows=[];cursor=null;hasNext=false;
   document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b===button));
-  const descriptions={products:['Produkte & Preise','Deine Produkte. Bis ins Detail.'],inventory:['Lagerbestand','Dein Bestand – je Variante und Lagerstandort.'],orders:['Bestellungen','Die letzten 60 Tage. Alles im Blick.']};
+  const descriptions={overview:['Shop-Übersicht','Dein aktueller Stand aus Shopify.'],collections:['Kategorien','Deine Shopify-Kollektionen und ihr Produktbestand.'],products:['Produkte & Preise','Deine Produkte. Bis ins Detail.'],inventory:['Lagerbestand','Dein Bestand – je Variante und Lagerstandort.'],orders:['Bestellungen','Die letzten 60 Tage. Alles im Blick.']};
   [$('page-title').textContent,$('page-description').textContent]=descriptions[page];load();
 }));
 $('refresh').addEventListener('click',()=>load());$('more').addEventListener('click',()=>load(true));
 $('logout').addEventListener('click',async()=>{try{await api('logout');}catch(error){message(error.message,true);}finally{signedOut();}});
 window.addEventListener('pagehide',signedOut);
+
+$('search').addEventListener('input',render);
+function csvCell(value) {
+  let text=String(value ?? '');
+  if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text="'"+text;
+  return '"'+text.replace(/"/g,'""')+'"';
+}
+$('export').addEventListener('click',()=>{
+  const selected=filteredRows();
+  const table=[['Bestellung','Datum','Zahlung','Erfüllung','Betrag','Währung','Notiz'],...selected.map(o=>[o.name,o.createdAt,o.displayFinancialStatus,o.displayFulfillmentStatus,o.currentTotalPriceSet.shopMoney.amount,o.currentTotalPriceSet.shopMoney.currencyCode,o.note])];
+  const url=URL.createObjectURL(new Blob(['\ufeff'+table.map(row=>row.map(csvCell).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  const link=el('a');link.href=url;link.download='plotwerk-bestellungen.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});

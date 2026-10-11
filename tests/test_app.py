@@ -69,6 +69,27 @@ class AppTests(unittest.TestCase):
         self.assertEqual(result['status'], 200)
         return result['body']['session']
 
+    def test_new_read_features_require_session_and_owner(self):
+        for action in ('overview', 'collections'):
+            self.assertEqual(self.request({'action': action})['status'], 403)
+            self.assertEqual(self.request({'action': action}, owner='43')['status'], 403)
+        self.assertEqual(self.api.calls, [])
+        token = self.login()
+        for action in ('overview', 'collections'):
+            self.assertEqual(self.request({'action': action, 'session': token})['status'], 200)
+        queries = [query for query, _ in self.api.calls]
+        self.assertTrue(any('products(first:100)' in query and 'orders(first:50' in query for query in queries))
+        self.assertTrue(any('collections(first:25' in query for query in queries))
+
+    def test_collection_cursor_is_bound_not_inserted_into_query(self):
+        token = self.login()
+        cursor = 'untrusted" query'
+        result = self.request({'action': 'collections', 'session': token, 'after': cursor})
+        self.assertEqual(result['status'], 200)
+        query, values = self.api.calls[-1]
+        self.assertNotIn(cursor, query)
+        self.assertEqual(values, {'after': cursor})
+
     def test_anonymous_and_other_customer_never_reach_shopify(self):
         for owner in ('', '43'):
             self.assertEqual(self.request({'action': 'login', 'password': PASSWORD}, owner=owner)['status'], 403)
