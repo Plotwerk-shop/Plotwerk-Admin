@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Plotwerk · Admin</title>
+  <link rel="stylesheet" href="__PROXY_PATH__/admin.css">
+  <script src="__PROXY_PATH__/admin.js" defer></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <section id="login" class="login-wrap">
+    <div class="login-card">
+      <div class="brand">Plotwerk<span>ADMIN</span></div>
+      <p class="eyebrow">DEIN SHOP. DEINE IDEEN.</p>
+      <h1>Willkommen zurück.</h1>
+      <p class="muted">Melde dich an, um deinen Shop zu verwalten.</p>
+      <form id="login-form">
+        <label for="email">Dein Admin-Konto</label>
+        <input id="email" type="email" value="info@plotwerk-shop.de" autocomplete="username" readonly>
+        <label for="password">Admin-Passwort</label>
+        <input id="password" type="password" minlength="16" maxlength="256" autocomplete="current-password" required>
+        <button class="primary" type="submit">Adminbereich öffnen <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="hint">Der Zugang setzt zusätzlich deine Anmeldung im Shop voraus.</p>
+      <a href="/">Zurück zum Shop</a>
+      <noscript><p>Bitte JavaScript aktivieren, um diesen Bereich zu nutzen.</p></noscript>
+    </div>
+  </section>
+  <div id="dashboard" class="shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">Plotwerk<span>ADMIN</span></div>
+      <p class="eyebrow">DEINE SCHALTZENTRALE</p>
+      <nav aria-label="Verwaltung">
+        <button data-page="products" class="nav-item active">◇ <span>Produkte & Preise</span></button>
+        <button data-page="inventory" class="nav-item">▦ <span>Lagerbestand</span></button>
+        <button data-page="orders" class="nav-item">▤ <span>Bestellungen</span></button>
+      </nav>
+      <div class="sidebar-bottom"><p>Angemeldet als<br><strong>info@plotwerk-shop.de</strong></p><button id="logout" class="secondary">Abmelden</button><a href="/">Zum Shop ↗</a></div>
+    </aside>
+    <main>
+      <header class="page-header"><div><p class="eyebrow">PLOTWERK VERWALTUNG</p><h1 id="page-title">Produkte & Preise</h1><p id="page-description" class="muted">Deine Produkte. Bis ins Detail.</p></div><button id="refresh" class="secondary">↻ Aktualisieren</button></header>
+      <div class="info-strip"><span class="live-dot" aria-hidden="true"></span>Direkt mit Shopify verbunden<span class="muted">Änderungen wirken auf deinen Shop.</span></div>
+      <div id="content" aria-busy="false"></div>
+      <button id="more" class="secondary load-more" hidden>Weitere laden</button>
+      <footer>Individuell gemacht. Von dir verwaltet.</footer>
+    </main>
+  </div>
+  <div id="message" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
